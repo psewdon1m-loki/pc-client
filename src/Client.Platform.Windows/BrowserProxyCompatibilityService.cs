@@ -8,6 +8,17 @@ public sealed class BrowserProxyCompatibilityService
     private const string ManagedBlockStart = "// Loki Proxy VPN managed proxy compatibility start";
     private const string ManagedBlockEnd = "// Loki Proxy VPN managed proxy compatibility end";
     private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+    private static readonly string[] ManagedPreferenceNames =
+    [
+        "network.proxy.type",
+        "network.proxy.failover_direct",
+        "network.proxy.no_proxies_on",
+        "network.http.http3.enabled",
+        "media.peerconnection.ice.proxy_only_if_behind_proxy",
+        "media.peerconnection.ice.default_address_only",
+        "media.peerconnection.ice.no_host"
+    ];
+
     private static readonly BrowserFamily[] BrowserFamilies =
     [
         new("zen", "zen", "zen"),
@@ -47,6 +58,23 @@ public sealed class BrowserProxyCompatibilityService
                 {
                     File.WriteAllText(userJsPath, next, Utf8NoBom);
                     updated++;
+                }
+
+                if (!enable)
+                {
+                    var prefsJsPath = Path.Combine(profileDirectory, "prefs.js");
+                    if (!File.Exists(prefsJsPath))
+                    {
+                        continue;
+                    }
+
+                    var previousPrefs = File.ReadAllText(prefsJsPath, Encoding.UTF8);
+                    var nextPrefs = RemoveManagedPreferenceLines(previousPrefs);
+                    if (!string.Equals(previousPrefs, nextPrefs, StringComparison.Ordinal))
+                    {
+                        File.WriteAllText(prefsJsPath, nextPrefs, Utf8NoBom);
+                        updated++;
+                    }
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -212,6 +240,33 @@ public sealed class BrowserProxyCompatibilityService
         var prefix = content[..startIndex].TrimEnd();
         var suffix = content[endIndex..].TrimStart();
         return JoinSections(prefix, suffix);
+    }
+
+    private static string RemoveManagedPreferenceLines(string content)
+    {
+        var changed = false;
+        var lines = content.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        var kept = new List<string>(lines.Length);
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.TrimStart();
+            if (ManagedPreferenceNames.Any(name => trimmed.StartsWith($"user_pref(\"{name}\"", StringComparison.Ordinal)))
+            {
+                changed = true;
+                continue;
+            }
+
+            kept.Add(line);
+        }
+
+        if (!changed)
+        {
+            return content;
+        }
+
+        var result = string.Join(Environment.NewLine, kept).TrimEnd();
+        return result.Length == 0 ? string.Empty : result + Environment.NewLine;
     }
 
     private static string JoinSections(params string[] sections)

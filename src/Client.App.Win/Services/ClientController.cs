@@ -295,7 +295,11 @@ public sealed class ClientController
             $"Xray config rendered | profile={activeProfile.Name} | host={activeProfile.Host}:{activeProfile.Port} | path={configPath}",
             cancellationToken).ConfigureAwait(false);
 
-        _previousProxyState ??= _proxy.Read();
+        if (_previousProxyState is null)
+        {
+            var currentProxyState = _proxy.Read();
+            _previousProxyState = _proxy.HasLokiLocalProxyTraces(currentProxyState) ? null : currentProxyState;
+        }
         var xrayResult = await _xray.StartAsync(new XrayRuntimeOptions
         {
             XrayExecutablePath = Path.Combine(_paths.RuntimeDirectory, "xray.exe"),
@@ -332,15 +336,7 @@ public sealed class ClientController
             if (!_proxy.IsEnabledForLocalHttpProxy(effectiveSettings.HttpPort))
             {
                 await _xray.StopAsync(cancellationToken).ConfigureAwait(false);
-                if (_previousProxyState is not null)
-                {
-                    _ = _proxy.Restore(_previousProxyState);
-                    _previousProxyState = null;
-                }
-                else
-                {
-                    _ = _proxy.DisableLocalProxyTraces();
-                }
+                RestoreOrClearProxyState();
 
                 var message = "Windows proxy settings were not applied to both WinINet and WinHTTP.";
                 Snapshot = Snapshot with { State = ConnectionStates.Error, ActiveProfileName = activeProfile.Name, LastError = message };
@@ -395,17 +391,8 @@ public sealed class ClientController
         }
 
         await _logger.InfoAsync("Disconnect requested.", cancellationToken).ConfigureAwait(false);
-        if (_previousProxyState is not null)
-        {
-            _ = _proxy.Restore(_previousProxyState);
-            _previousProxyState = null;
-            await _logger.InfoAsync("System proxy restored from previous state.", cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            _ = _proxy.DisableLocalProxyTraces();
-            await _logger.InfoAsync("Local proxy traces disabled.", cancellationToken).ConfigureAwait(false);
-        }
+        RestoreOrClearProxyState();
+        await _logger.InfoAsync("System proxy restored or Loki proxy traces disabled.", cancellationToken).ConfigureAwait(false);
 
         await _xray.StopAsync(cancellationToken).ConfigureAwait(false);
         await _logger.InfoAsync("Xray process manager stopped.", cancellationToken).ConfigureAwait(false);
@@ -820,9 +807,9 @@ public sealed class ClientController
 
     private async Task CleanupStaleRuntimeAsync(AppSettings settings, CancellationToken cancellationToken)
     {
-        if (_proxy.HasLocalProxyTraces())
+        if (_proxy.HasLokiLocalProxyTraces())
         {
-            var proxyResult = _proxy.DisableLocalProxyTraces();
+            var proxyResult = _proxy.DisableLokiLocalHttpProxy();
             if (!proxyResult.Success)
             {
                 await _logger.ErrorAsync(proxyResult.Message, cancellationToken).ConfigureAwait(false);
@@ -838,6 +825,19 @@ public sealed class ClientController
         {
             await _logger.InfoAsync($"Cleaned stale Loki Xray processes | count={killed}", cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private void RestoreOrClearProxyState()
+    {
+        var previous = _previousProxyState;
+        _previousProxyState = null;
+        if (previous is not null && !_proxy.HasLokiLocalProxyTraces(previous))
+        {
+            _ = _proxy.Restore(previous);
+            return;
+        }
+
+        _ = _proxy.DisableLokiLocalHttpProxy();
     }
 
     private string GetXrayExecutablePath()

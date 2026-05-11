@@ -126,7 +126,8 @@ public sealed class SystemProxyService
     {
         var state = Read();
         if ((!state.ProxyEnabled || !IsLokiLocalHttpProxy(state.ProxyServer))
-            && !IsLokiLocalHttpProxy(state.WinHttpProxy))
+            && !IsLokiLocalHttpProxy(state.WinHttpProxy)
+            && !HasLokiLocalProxyEnvironment(state))
         {
             return OperationResult.Ok("System proxy is not owned by Loki.");
         }
@@ -166,7 +167,18 @@ public sealed class SystemProxyService
         var state = Read();
         return IsLocalProxy(state.ProxyServer)
             || IsLocalProxy(state.AutoConfigUrl)
-            || IsLocalProxy(state.WinHttpProxy);
+            || IsLocalProxy(state.WinHttpProxy)
+            || IsLocalProxy(state.HttpProxyEnvironment)
+            || IsLocalProxy(state.HttpsProxyEnvironment)
+            || IsLocalProxy(state.AllProxyEnvironment);
+    }
+
+    public bool HasLokiLocalProxyTraces(SystemProxyState? state = null)
+    {
+        state ??= Read();
+        return IsLokiLocalHttpProxy(state.ProxyServer)
+            || IsLokiLocalHttpProxy(state.WinHttpProxy)
+            || HasLokiLocalProxyEnvironment(state);
     }
 
     public OperationResult DisableLocalProxyTraces()
@@ -174,7 +186,10 @@ public sealed class SystemProxyService
         var state = Read();
         if (!IsLocalProxy(state.ProxyServer)
             && !IsLocalProxy(state.AutoConfigUrl)
-            && !IsLocalProxy(state.WinHttpProxy))
+            && !IsLocalProxy(state.WinHttpProxy)
+            && !IsLocalProxy(state.HttpProxyEnvironment)
+            && !IsLocalProxy(state.HttpsProxyEnvironment)
+            && !IsLocalProxy(state.AllProxyEnvironment))
         {
             return OperationResult.Ok("No local proxy traces found.");
         }
@@ -211,6 +226,11 @@ public sealed class SystemProxyService
 
     public OperationResult Restore(SystemProxyState state)
     {
+        if (HasLokiLocalProxyTraces(state))
+        {
+            return DisableLokiLocalHttpProxy();
+        }
+
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(InternetSettingsKey, writable: true);
@@ -410,6 +430,13 @@ public sealed class SystemProxyService
         }
 
         return false;
+    }
+
+    private static bool HasLokiLocalProxyEnvironment(SystemProxyState state)
+    {
+        return IsLokiLocalHttpProxy(state.HttpProxyEnvironment)
+            || IsLokiLocalHttpProxy(state.HttpsProxyEnvironment)
+            || IsLokiLocalHttpProxy(state.AllProxyEnvironment);
     }
 
     private static bool IsLocalProxy(string? value)
