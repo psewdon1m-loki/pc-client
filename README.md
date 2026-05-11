@@ -100,11 +100,11 @@ Example:
 ```json
 {
   "channel": "stable",
-  "version": "0.1.52",
-  "minimumVersion": "0.1.52",
+  "version": "<version>",
+  "minimumVersion": "<version>",
   "publishedAt": "2026-05-11T00:00:00Z",
   "installer": {
-    "url": "https://github.com/psewdon1m-loki/pc-client/releases/download/v0.1.52/LokiClientSetup-0.1.52-win-x64.exe",
+    "url": "https://github.com/psewdon1m-loki/pc-client/releases/download/v<version>/LokiClientSetup-<version>-win-x64.exe",
     "sha256": "<installer-sha256>",
     "mandatory": false
   },
