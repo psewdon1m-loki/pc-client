@@ -1,0 +1,56 @@
+{
+  "id": "russia-smart",
+  "name": "Russia smart",
+  "domainStrategy": "IPOnDemand",
+  "source": "v2rayN-windows-64/guiConfigs/guiNDB.db",
+  "rules": [
+    {
+      "remarks": "Direct Ozon",
+      "outboundTag": "direct",
+      "enabled": true,
+      "domains": [
+        "domain:ozon.ru",
+        "domain:ozone.ru",
+        "domain:ozonusercontent.com"
+      ]
+    },
+    {
+      "remarks": "Direct bittorrent",
+      "outboundTag": "direct",
+      "enabled": true,
+      "protocols": [
+        "bittorrent"
+      ]
+    },
+    {
+      "remarks": "Direct private networks",
+      "outboundTag": "direct",
+      "enabled": true,
+      "ips": [
+        "geoip:private"
+      ]
+    },
+    {
+      "remarks": "Direct private domains",
+      "outboundTag": "direct",
+      "enabled": true,
+      "domains": [
+        "geosite:private"
+      ]
+    },
+    {
+      "remarks": "Direct Russian IP",
+      "outboundTag": "direct",
+      "enabled": true,
+      "ips": [
+        "geoip:ru"
+      ]
+    },
+    {
+      "remarks": "Proxy everything else",
+      "outboundTag": "proxy",
+      "enabled": true,
+      "port": "0-65535"
+    }
+  ]
+}

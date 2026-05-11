@@ -1,0 +1,12 @@
+{
+  "id": "ozon-direct",
+  "name": "Ozon напрямую",
+  "outboundTag": "direct",
+  "domains": [
+    "domain:ozon.ru",
+    "domain:ozone.ru",
+    "domain:ozonusercontent.com"
+  ],
+  "enabled": true
+}
+

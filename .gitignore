@@ -1,0 +1,55 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local secrets / production overrides
+loki.env
+src/Client.App.Win/loki.env
+artifacts/**/loki.env
+*.env.local
+
+# Build output
+bin/
+obj/
+src/**/bin/
+src/**/obj/
+tests/**/bin/
+tests/**/obj/
+tools/**/bin/
+tools/**/obj/
+TestResults/
+artifacts/
+publish/
+
+# Local SDK bootstrap/cache
+.dotnet/
+.dotnet-install.ps1
+
+# Runtime files
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+runtime/
+logs/
+
+# NuGet / installers / archives
+*.nupkg
+*.snupkg
+*.msi
+*.7z
+*.rar
+*.tar
+*.gz
+*.zip
+
+# Local reference distribution, not product source
+v2rayN-windows-64/

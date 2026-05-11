@@ -1,0 +1,37 @@
+{
+  "id": "global",
+  "name": "Global",
+  "domainStrategy": "AsIs",
+  "source": "v2rayN-windows-64/guiConfigs/guiNDB.db",
+  "rules": [
+    {
+      "remarks": "Block UDP 443",
+      "outboundTag": "block",
+      "enabled": true,
+      "port": "443",
+      "network": "udp"
+    },
+    {
+      "remarks": "Direct private networks",
+      "outboundTag": "direct",
+      "enabled": true,
+      "ips": [
+        "geoip:private"
+      ]
+    },
+    {
+      "remarks": "Direct private domains",
+      "outboundTag": "direct",
+      "enabled": true,
+      "domains": [
+        "geosite:private"
+      ]
+    },
+    {
+      "remarks": "Proxy everything else",
+      "outboundTag": "proxy",
+      "enabled": true,
+      "port": "0-65535"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Client.Core\Client.Core.csproj" />
+    <ProjectReference Include="..\..\src\Client.Profiles\Client.Profiles.csproj" />
+    <ProjectReference Include="..\..\src\Client.Routing\Client.Routing.csproj" />
+    <ProjectReference Include="..\..\src\Client.Transport.Xray\Client.Transport.Xray.csproj" />
+    <ProjectReference Include="..\..\src\Client.Updater\Client.Updater.csproj" />
+    <ProjectReference Include="..\..\src\Client.Telemetry\Client.Telemetry.csproj" />
+    <ProjectReference Include="..\..\src\Client.Platform.Windows\Client.Platform.Windows.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

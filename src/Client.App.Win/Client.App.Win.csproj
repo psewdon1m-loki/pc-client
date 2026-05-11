@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Client.Core\Client.Core.csproj" />
+    <ProjectReference Include="..\Client.Profiles\Client.Profiles.csproj" />
+    <ProjectReference Include="..\Client.Routing\Client.Routing.csproj" />
+    <ProjectReference Include="..\Client.Transport.Xray\Client.Transport.Xray.csproj" />
+    <ProjectReference Include="..\Client.Storage\Client.Storage.csproj" />
+    <ProjectReference Include="..\Client.Updater\Client.Updater.csproj" />
+    <ProjectReference Include="..\Client.Telemetry\Client.Telemetry.csproj" />
+    <ProjectReference Include="..\Client.Platform.Windows\Client.Platform.Windows.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <ApplicationIcon>Assets\Icons\app.ico</ApplicationIcon>
+    <SatelliteResourceLanguages>ru;en</SatelliteResourceLanguages>
+    <AssemblyTitle>Loki Proxy VPN</AssemblyTitle>
+    <Product>Loki Proxy VPN</Product>
+    <Description>Loki VPN proxy client</Description>
+    <Version>0.1.52</Version>
+    <AssemblyVersion>0.1.52.0</AssemblyVersion>
+    <FileVersion>0.1.52.0</FileVersion>
+    <InformationalVersion>0.1.52</InformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\**\*" Exclude="Assets\Fonts\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="loki.env.example">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="loki.env" Condition="Exists('loki.env')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Resource Include="Assets\Fonts\*.ttf" />
+  </ItemGroup>
+
+</Project>

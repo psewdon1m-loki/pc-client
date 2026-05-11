@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Client.Core\Client.Core.csproj" />
+    <ProjectReference Include="..\..\src\Client.Profiles\Client.Profiles.csproj" />
+    <ProjectReference Include="..\..\src\Client.Routing\Client.Routing.csproj" />
+    <ProjectReference Include="..\..\src\Client.Transport.Xray\Client.Transport.Xray.csproj" />
+    <ProjectReference Include="..\..\src\Client.Storage\Client.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Client.Updater\Client.Updater.csproj" />
+    <ProjectReference Include="..\..\src\Client.Telemetry\Client.Telemetry.csproj" />
+    <ProjectReference Include="..\..\src\Client.Platform.Windows\Client.Platform.Windows.csproj" />
+  </ItemGroup>
+
+</Project>
