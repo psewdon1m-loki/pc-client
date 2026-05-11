@@ -28,8 +28,8 @@ public sealed class ClientController
     private readonly SystemProxyService _proxy = new();
     private readonly ProxyConnectivityVerifier _connectivityVerifier = new();
     private readonly BrowserProxyCompatibilityService _browserProxyCompatibility = new();
-    private readonly GeoAssetUpdater _geoUpdater = new(new HttpClient());
-    private readonly UpdateService _updateService = new(new HttpClient { Timeout = TimeSpan.FromSeconds(60) });
+    private readonly GeoAssetUpdater _geoUpdater;
+    private readonly UpdateService _updateService;
     private readonly SemaphoreSlim _operationLock = new(1, 1);
     private readonly SemaphoreSlim _updateCheckLock = new(1, 1);
     private readonly TelemetryService _telemetry;
@@ -44,6 +44,9 @@ public sealed class ClientController
 
     public ClientController()
     {
+        _ = _proxy.DisableLokiLocalHttpProxy();
+        _geoUpdater = new GeoAssetUpdater(new HttpClient());
+        _updateService = new UpdateService(new HttpClient { Timeout = TimeSpan.FromSeconds(60) });
         _database = new ClientDatabase(_paths.DatabasePath);
         _profiles = new ProfileRepository(_database);
         _settings = new SettingsRepository(_database);

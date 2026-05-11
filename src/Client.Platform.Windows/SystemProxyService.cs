@@ -55,11 +55,7 @@ public sealed class SystemProxyService
             key.SetValue("ProxyOverride", proxyBypass, RegistryValueKind.String);
             key.DeleteValue("AutoConfigURL", throwOnMissingValue: false);
             SetWinHttpProxy(winHttpProxyServer, proxyBypass);
-            RunProxySideEffects(() =>
-            {
-                SetProxyEnvironment(httpPort, proxyBypass);
-                NotifyWindows();
-            });
+            RunProxySideEffects(NotifyWindows);
             return OperationResult.Ok("System proxy включен.");
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
@@ -274,17 +270,14 @@ public sealed class SystemProxyService
 
     private static void RunProxySideEffects(Action action)
     {
-        _ = Task.Run(() =>
+        try
         {
-            try
-            {
-                action();
-            }
-            catch
-            {
-                // Proxy registry and WinHTTP are the critical path; environment/broadcast failures are non-fatal.
-            }
-        });
+            action();
+        }
+        catch
+        {
+            // Proxy registry and WinHTTP are the critical path; environment/broadcast failures are non-fatal.
+        }
     }
 
     private static void SetOrDelete(RegistryKey key, string name, string? value)
@@ -303,26 +296,6 @@ public sealed class SystemProxyService
     {
         using var key = Registry.CurrentUser.OpenSubKey(EnvironmentKey, writable: false);
         return key?.GetValue(name) as string;
-    }
-
-    private static void SetProxyEnvironment(int httpPort, string proxyBypass)
-    {
-        var proxy = $"http://127.0.0.1:{httpPort}";
-        using var key = Registry.CurrentUser.OpenSubKey(EnvironmentKey, writable: true)
-            ?? Registry.CurrentUser.CreateSubKey(EnvironmentKey, writable: true);
-        key.SetValue("HTTP_PROXY", proxy, RegistryValueKind.String);
-        key.SetValue("HTTPS_PROXY", proxy, RegistryValueKind.String);
-        key.SetValue("ALL_PROXY", proxy, RegistryValueKind.String);
-        key.SetValue("NO_PROXY", ProxyBypassToNoProxy(proxyBypass), RegistryValueKind.String);
-
-        Environment.SetEnvironmentVariable("HTTP_PROXY", proxy, EnvironmentVariableTarget.Process);
-        Environment.SetEnvironmentVariable("HTTPS_PROXY", proxy, EnvironmentVariableTarget.Process);
-        Environment.SetEnvironmentVariable("ALL_PROXY", proxy, EnvironmentVariableTarget.Process);
-        Environment.SetEnvironmentVariable("NO_PROXY", ProxyBypassToNoProxy(proxyBypass), EnvironmentVariableTarget.Process);
-        Environment.SetEnvironmentVariable("HTTP_PROXY", proxy, EnvironmentVariableTarget.User);
-        Environment.SetEnvironmentVariable("HTTPS_PROXY", proxy, EnvironmentVariableTarget.User);
-        Environment.SetEnvironmentVariable("ALL_PROXY", proxy, EnvironmentVariableTarget.User);
-        Environment.SetEnvironmentVariable("NO_PROXY", ProxyBypassToNoProxy(proxyBypass), EnvironmentVariableTarget.User);
     }
 
     private static void RestoreProxyEnvironment(SystemProxyState state)
@@ -384,14 +357,6 @@ public sealed class SystemProxyService
             Environment.SetEnvironmentVariable(name, value, EnvironmentVariableTarget.Process);
             Environment.SetEnvironmentVariable(name, value, EnvironmentVariableTarget.User);
         }
-    }
-
-    private static string ProxyBypassToNoProxy(string proxyBypass)
-    {
-        return proxyBypass
-            .Replace(";", ",", StringComparison.Ordinal)
-            .Replace("<local>", "localhost", StringComparison.OrdinalIgnoreCase)
-            .Replace("*", "", StringComparison.Ordinal);
     }
 
     private static bool IsLocalNoProxy(string value)
