@@ -1,0 +1,6 @@
+src/Client.App.Win/Assets/geo/*.dat filter=lfs diff=lfs merge=lfs -text
+src/Client.App.Win/Assets/xray/*.exe filter=lfs diff=lfs merge=lfs -text
+src/Client.App.Win/Assets/Fonts/*.ttf filter=lfs diff=lfs merge=lfs -text
+src/Client.App.Win/Assets/Icons/*.png filter=lfs diff=lfs merge=lfs -text
+src/Client.App.Win/Assets/Icons/*.ico filter=lfs diff=lfs merge=lfs -text
+src/Client.App.Win/Assets/Onboarding/*.png filter=lfs diff=lfs merge=lfs -text
