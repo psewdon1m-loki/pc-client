@@ -85,6 +85,35 @@ public sealed class UpdateServiceTests
         Assert.True(result.ManifestUnavailable);
     }
 
+    [Fact]
+    public async Task CheckAndApplyAsync_AcceptsUtf8BomManifest()
+    {
+        var manifest = new
+        {
+            channel = "stable",
+            version = "0.1.0"
+        };
+        var manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var bomManifestBytes = Encoding.UTF8.GetPreamble().Concat(manifestBytes).ToArray();
+        var service = new UpdateService(new HttpClient(new StaticResponseHandler(new Dictionary<string, byte[]>
+        {
+            ["https://updates.example.test/manifest.json"] = bomManifestBytes
+        })));
+
+        var result = await service.CheckAndApplyAsync(
+            new UpdateEndpointConfig
+            {
+                ManifestUrl = new Uri("https://updates.example.test/manifest.json")
+            },
+            "0.1.0",
+            Path.GetTempPath(),
+            Path.GetTempPath(),
+            Path.GetTempPath());
+
+        Assert.True(result.Success, result.Message);
+        Assert.False(result.ManifestUnavailable);
+    }
+
     private static byte[] CreateRuleSetZip()
     {
         using var stream = new MemoryStream();

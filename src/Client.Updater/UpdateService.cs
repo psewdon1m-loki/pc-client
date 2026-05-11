@@ -43,7 +43,7 @@ public sealed class UpdateService(HttpClient httpClient)
                 }
             }
 
-            manifest = JsonSerializer.Deserialize<UpdateManifest>(manifestBytes, JsonOptions) ?? new UpdateManifest();
+            manifest = JsonSerializer.Deserialize<UpdateManifest>(StripUtf8Bom(manifestBytes), JsonOptions) ?? new UpdateManifest();
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or JsonException or CryptographicException)
         {
@@ -248,6 +248,13 @@ public sealed class UpdateService(HttpClient httpClient)
         using var rsa = RSA.Create();
         rsa.ImportFromPem(publicKeyPem);
         return rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+
+    private static ReadOnlySpan<byte> StripUtf8Bom(byte[] value)
+    {
+        return value.Length >= 3 && value[0] == 0xEF && value[1] == 0xBB && value[2] == 0xBF
+            ? value.AsSpan(3)
+            : value;
     }
 
     private static byte[]? TryFromBase64(string value)
