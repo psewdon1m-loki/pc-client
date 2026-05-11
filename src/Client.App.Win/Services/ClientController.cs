@@ -78,7 +78,7 @@ public sealed class ClientController
         new AssetBootstrapper(_paths).EnsureRuntimeAssets();
         var settings = await _settings.LoadAsync(cancellationToken).ConfigureAwait(false);
         await CleanupStaleRuntimeAsync(settings, cancellationToken).ConfigureAwait(false);
-        await PrepareBrowserProxyCompatibilityAsync(cancellationToken).ConfigureAwait(false);
+        await CleanupBrowserProxyCompatibilityAsync(cancellationToken).ConfigureAwait(false);
         var profiles = await _profiles.ListAsync(cancellationToken).ConfigureAwait(false);
         _telemetry.UpdateContext(settings, profiles);
         await _telemetry.ConfigureAsync(settings.LogsConsent, cancellationToken).ConfigureAwait(false);
@@ -390,6 +390,7 @@ public sealed class ClientController
             && _previousProxyState is null
             && !_xray.IsRunning)
         {
+            await CleanupBrowserProxyCompatibilityAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -409,6 +410,7 @@ public sealed class ClientController
         await _xray.StopAsync(cancellationToken).ConfigureAwait(false);
         await _logger.InfoAsync("Xray process manager stopped.", cancellationToken).ConfigureAwait(false);
         await XrayProcessManager.KillProcessesByExecutablePathAsync(GetXrayExecutablePath(), cancellationToken).ConfigureAwait(false);
+        await CleanupBrowserProxyCompatibilityAsync(cancellationToken).ConfigureAwait(false);
         Snapshot = Snapshot with { State = ConnectionStates.Disconnected, UpdatedAt = DateTimeOffset.UtcNow };
         await _logger.InfoAsync("Disconnected | system proxy restored | xray stopped.", cancellationToken).ConfigureAwait(false);
         _ = RecordTelemetryStatusInBackground(Snapshot, "disconnected telemetry");
@@ -797,6 +799,22 @@ public sealed class ClientController
         foreach (var error in compatibility.Errors)
         {
             await _logger.ErrorAsync($"Browser proxy compatibility failed | {error}", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task CleanupBrowserProxyCompatibilityAsync(CancellationToken cancellationToken)
+    {
+        var compatibility = _browserProxyCompatibility.RemoveSystemProxyCompatibility();
+        if (compatibility.UpdatedProfileCount > 0)
+        {
+            await _logger.InfoAsync(
+                $"Browser proxy compatibility cleaned | profiles={compatibility.ProfileCount} | updated={compatibility.UpdatedProfileCount} | running={compatibility.RunningProcessCount}",
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var error in compatibility.Errors)
+        {
+            await _logger.ErrorAsync($"Browser proxy compatibility cleanup failed | {error}", cancellationToken).ConfigureAwait(false);
         }
     }
 

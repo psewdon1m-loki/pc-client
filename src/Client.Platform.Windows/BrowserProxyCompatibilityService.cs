@@ -19,6 +19,16 @@ public sealed class BrowserProxyCompatibilityService
 
     public BrowserProxyCompatibilityResult EnsureSystemProxyCompatibility()
     {
+        return UpdateSystemProxyCompatibility(enable: true);
+    }
+
+    public BrowserProxyCompatibilityResult RemoveSystemProxyCompatibility()
+    {
+        return UpdateSystemProxyCompatibility(enable: false);
+    }
+
+    private static BrowserProxyCompatibilityResult UpdateSystemProxyCompatibility(bool enable)
+    {
         var profileDirectories = FindBrowserProfileDirectories().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var updated = 0;
         var errors = new List<string>();
@@ -32,7 +42,7 @@ public sealed class BrowserProxyCompatibilityService
                 var previous = File.Exists(userJsPath)
                     ? File.ReadAllText(userJsPath, Encoding.UTF8)
                     : string.Empty;
-                var next = UpsertManagedBlock(previous);
+                var next = enable ? UpsertManagedBlock(previous) : RemoveManagedBlock(previous);
                 if (!string.Equals(previous, next, StringComparison.Ordinal))
                 {
                     File.WriteAllText(userJsPath, next, Utf8NoBom);
@@ -177,6 +187,31 @@ public sealed class BrowserProxyCompatibilityService
         }
 
         return JoinSections(content.TrimEnd(), managedBlock.TrimEnd(), string.Empty);
+    }
+
+    private static string RemoveManagedBlock(string content)
+    {
+        var startIndex = content.IndexOf(ManagedBlockStart, StringComparison.Ordinal);
+        if (startIndex < 0)
+        {
+            return content;
+        }
+
+        var endIndex = content.IndexOf(ManagedBlockEnd, startIndex, StringComparison.Ordinal);
+        if (endIndex < 0)
+        {
+            return content;
+        }
+
+        endIndex += ManagedBlockEnd.Length;
+        while (endIndex < content.Length && (content[endIndex] == '\r' || content[endIndex] == '\n'))
+        {
+            endIndex++;
+        }
+
+        var prefix = content[..startIndex].TrimEnd();
+        var suffix = content[endIndex..].TrimStart();
+        return JoinSections(prefix, suffix);
     }
 
     private static string JoinSections(params string[] sections)
