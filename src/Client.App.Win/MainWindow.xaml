@@ -485,6 +485,8 @@
                 </Button>
                 <TextBlock x:Name="SettingsMessageText" Canvas.Left="32" Canvas.Top="430" Width="430" TextWrapping="Wrap"
                            FontFamily="{StaticResource PixelFont}" FontSize="18" Foreground="{StaticResource GreenBrush}" />
+                <TextBlock x:Name="ClientVersionText" Canvas.Left="32" Canvas.Top="744" Width="430"
+                           FontFamily="{StaticResource PixelFont}" FontSize="14" Foreground="#777777" TextAlignment="Right" />
             </Canvas>
         </Grid>
 

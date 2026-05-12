@@ -13,6 +13,7 @@ using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using Client.App.Win.Services;
 using Client.Core;
+using Client.Updater;
 using Forms = System.Windows.Forms;
 
 namespace Client.App.Win;
@@ -890,6 +891,7 @@ public partial class MainWindow : Window
         AutoUpdateToggleText.Text = _settings.AutoUpdateRules
             ? "3. Auto updates enabled"
             : "3. Auto updates disabled";
+        ClientVersionText.Text = $"client v{UpdateService.GetCurrentApplicationVersion()}";
     }
 
     private async Task RefreshProfilesAsync()
