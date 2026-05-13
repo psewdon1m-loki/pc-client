@@ -1087,7 +1087,10 @@ public partial class MainWindow : Window
     private void UpdateTopBar(UIElement screen)
     {
         var isLightScreen = ReferenceEquals(screen, AddConnectionScreen);
-        TopBar.Background = isLightScreen ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.Black;
+        var isEntryScreen = ReferenceEquals(screen, EntryScreen);
+        TopBar.Background = isEntryScreen
+            ? (System.Windows.Media.Brush)FindResource("GreenBrush")
+            : isLightScreen ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.Black;
         var buttonBrush = isLightScreen ? System.Windows.Media.Brushes.Black : System.Windows.Media.Brushes.White;
         TopMinimizeText.Foreground = buttonBrush;
         TopCloseText.Foreground = buttonBrush;

@@ -207,15 +207,48 @@ public sealed class UpdateService(HttpClient httpClient)
             File.Move(tempPath, installerPath, overwrite: true);
         }
 
+        StartDetachedInstallerHelper(installerPath, manifest.Version, dataDirectory, appBaseDirectory);
+        return true;
+    }
+
+    private static void StartDetachedInstallerHelper(
+        string installerPath,
+        string targetVersion,
+        string dataDirectory,
+        string appBaseDirectory)
+    {
+        var logsDirectory = Path.Combine(dataDirectory, "logs");
+        Directory.CreateDirectory(logsDirectory);
+
+        var safeVersion = string.Join("_", targetVersion.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+        var logPath = Path.Combine(logsDirectory, $"update-installer-{safeVersion}.log");
+        var appPath = Path.Combine(appBaseDirectory, "Client.App.Win.exe");
+        var currentProcessId = Environment.ProcessId;
+        var installerArguments =
+            $"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /RESTARTAPPLICATIONS /LOG={QuoteCmd(logPath)}";
+
+        var command =
+            "/d /c " +
+            "timeout /t 2 /nobreak >nul " +
+            $"& taskkill /PID {currentProcessId} /F >nul 2>nul " +
+            "& timeout /t 1 /nobreak >nul " +
+            $"& {QuoteCmd(installerPath)} {installerArguments} " +
+            $"& if exist {QuoteCmd(appPath)} start \"\" {QuoteCmd(appPath)}";
+
         Process.Start(new ProcessStartInfo
         {
-            FileName = installerPath,
-            Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
-            WorkingDirectory = appBaseDirectory,
-            UseShellExecute = true,
+            FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
+            Arguments = command,
+            WorkingDirectory = dataDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden
         });
-        return true;
+    }
+
+    private static string QuoteCmd(string value)
+    {
+        return "\"" + value.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
     }
 
     private async Task DownloadFileAsync(string url, string targetPath, CancellationToken cancellationToken)

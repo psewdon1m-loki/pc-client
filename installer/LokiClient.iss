@@ -1,5 +1,5 @@
 #define MyAppName "Loki Proxy VPN"
-#define MyAppVersion "0.1.61"
+#define MyAppVersion "0.1.62"
 #define MyAppPublisher "Loki"
 #define MyAppExeName "Client.App.Win.exe"
 
@@ -17,6 +17,7 @@ OutputDir=..\artifacts\installer
 OutputBaseFilename=LokiClientSetup-{#MyAppVersion}-win-x64
 Compression=lzma2
 SolidCompression=yes
+SetupLogging=yes
 WizardStyle=modern
 SetupIconFile=..\src\Client.App.Win\Assets\Icons\app.ico
 PrivilegesRequired=lowest
@@ -26,7 +27,6 @@ UninstallDisplayIcon={app}\Assets\Icons\app.ico
 UsePreviousAppDir=no
 CloseApplications=yes
 RestartApplications=yes
-AppMutex=Local\LokiClient.SingleInstance
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -78,3 +78,21 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden waituntilterminated skipifdoesntexist
 Filename: "{app}\{#MyAppExeName}"; Description: "Запустить {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait skipifnotsilent
+
+[Code]
+procedure ForceCloseRunningClient();
+var
+  ResultCode: Integer;
+begin
+  if WizardSilent then
+  begin
+    Exec(ExpandConstant('{cmd}'), '/c taskkill /IM "{#MyAppExeName}" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  ForceCloseRunningClient();
+  Result := True;
+end;
