@@ -13,6 +13,7 @@ public static class UpdateEndpointConfigLoader
         foreach (var name in new[]
                  {
                      "LOKI_UPDATE_MANIFEST_URL",
+                     "LOKI_UPDATE_FALLBACK_MANIFEST_URL",
                      "LOKI_UPDATE_CHANNEL",
                      "LOKI_UPDATE_PUBLIC_KEY_PEM",
                      "LOKI_UPDATE_CHECK_INTERVAL_MINUTES"
@@ -33,6 +34,10 @@ public static class UpdateEndpointConfigLoader
         return new UpdateEndpointConfig
         {
             ManifestUrl = manifestUrl,
+            FallbackManifestUrl = values.TryGetValue("LOKI_UPDATE_FALLBACK_MANIFEST_URL", out var rawFallbackUrl)
+                && Uri.TryCreate(rawFallbackUrl, UriKind.Absolute, out var parsedFallbackUrl)
+                    ? parsedFallbackUrl
+                    : null,
             Channel = values.TryGetValue("LOKI_UPDATE_CHANNEL", out var channel) && !string.IsNullOrWhiteSpace(channel)
                 ? channel.Trim()
                 : "stable",

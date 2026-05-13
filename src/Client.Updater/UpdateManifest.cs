@@ -43,13 +43,15 @@ public sealed record UpdateCheckResult
     public bool WatcherChanged { get; init; }
     public IReadOnlyList<string> UpdatedRuleSets { get; init; } = [];
     public UpdateWatcherConfig? Watcher { get; init; }
+    public Uri? ManifestSource { get; init; }
 
     public static UpdateCheckResult Ok(
         string message,
         bool appInstallerStarted = false,
         bool watcherChanged = false,
         IReadOnlyList<string>? updatedRuleSets = null,
-        UpdateWatcherConfig? watcher = null)
+        UpdateWatcherConfig? watcher = null,
+        Uri? manifestSource = null)
     {
         return new UpdateCheckResult
         {
@@ -58,7 +60,8 @@ public sealed record UpdateCheckResult
             AppInstallerStarted = appInstallerStarted,
             WatcherChanged = watcherChanged,
             UpdatedRuleSets = updatedRuleSets ?? [],
-            Watcher = watcher
+            Watcher = watcher,
+            ManifestSource = manifestSource
         };
     }
 
@@ -76,10 +79,11 @@ public sealed record UpdateCheckResult
 public sealed record UpdateEndpointConfig
 {
     public Uri? ManifestUrl { get; init; }
+    public Uri? FallbackManifestUrl { get; init; }
     public string Channel { get; init; } = "stable";
     public string? PublicKeyPem { get; init; }
     public TimeSpan CheckInterval { get; init; } = TimeSpan.FromHours(6);
 
     [JsonIgnore]
-    public bool IsConfigured => ManifestUrl is not null;
+    public bool IsConfigured => ManifestUrl is not null || FallbackManifestUrl is not null;
 }

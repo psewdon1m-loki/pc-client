@@ -72,10 +72,9 @@ public sealed class TelemetryService
     public async Task<OperationResult> VerifyAsync(CancellationToken cancellationToken = default)
     {
         await ConfigureAsync(_includeLogs, cancellationToken).ConfigureAwait(false);
-        var identity = await GetIdentityAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await _transport.EnrollAsync(_config, identity, CreateDeviceInfo(identity), cancellationToken).ConfigureAwait(false);
+            await EnsureEnrolledAsync(cancellationToken).ConfigureAwait(false);
             return OperationResult.Ok("Telemetry verified.");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
@@ -92,6 +91,17 @@ public sealed class TelemetryService
         }
 
         return TryIgnoreNetworkErrorsAsync(() => CollectNowAsync(cancellationToken));
+    }
+
+    public async Task EnsureEnrolledAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_enabled)
+        {
+            await ConfigureAsync(_includeLogs, cancellationToken).ConfigureAwait(false);
+        }
+
+        var identity = await GetIdentityAsync(cancellationToken).ConfigureAwait(false);
+        await _transport.EnrollAsync(_config, identity, CreateDeviceInfo(identity), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task RecordStatusAsync(ConnectionSnapshot snapshot, CancellationToken cancellationToken = default)
@@ -180,7 +190,7 @@ public sealed class TelemetryService
         try
         {
             var identity = await GetIdentityAsync(cancellationToken).ConfigureAwait(false);
-            await _transport.EnrollAsync(_config, identity, CreateDeviceInfo(identity), cancellationToken).ConfigureAwait(false);
+            await EnsureEnrolledAsync(cancellationToken).ConfigureAwait(false);
             var batch = await _queue.ReadBatchAsync(100, cancellationToken).ConfigureAwait(false);
             if (batch.Count == 0)
             {
@@ -268,7 +278,18 @@ public sealed class TelemetryService
             await TryIgnoreNetworkErrorsAsync(async () =>
             {
                 var identity = await GetIdentityAsync(cancellationToken).ConfigureAwait(false);
-                var commands = await _transport.FetchCommandsAsync(_config, identity, cancellationToken).ConfigureAwait(false);
+                await EnsureEnrolledAsync(cancellationToken).ConfigureAwait(false);
+                IReadOnlyList<TelemetryCommand> commands;
+                try
+                {
+                    commands = await _transport.FetchCommandsAsync(_config, identity, cancellationToken).ConfigureAwait(false);
+                }
+                catch (HttpRequestException ex) when (TelemetryTransport.RequiresReEnroll(ex))
+                {
+                    await EnsureEnrolledAsync(cancellationToken).ConfigureAwait(false);
+                    commands = await _transport.FetchCommandsAsync(_config, identity, cancellationToken).ConfigureAwait(false);
+                }
+
                 foreach (var command in commands)
                 {
                     if (string.Equals(command.Type, "collect_now", StringComparison.OrdinalIgnoreCase))

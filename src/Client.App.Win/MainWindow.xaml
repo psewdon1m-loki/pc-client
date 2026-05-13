@@ -292,23 +292,20 @@
         </Grid>
 
         <Grid x:Name="Root" Grid.Row="1" Width="500" Height="800" ClipToBounds="True" Background="#000000">
-        <Grid x:Name="EntryScreen" Background="#000000" Visibility="Collapsed">
-            <Border Width="452" Height="765" Margin="0,35,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
-                    Background="{StaticResource GreenBrush}" CornerRadius="0,36,0,0">
-                <Canvas>
-                    <TextBlock Canvas.Left="30" Canvas.Top="45" Text="LOKI" FontFamily="{StaticResource DecorFont}" FontSize="80" Foreground="#FFFFFF" />
-                    <TextBlock Canvas.Left="30" Canvas.Top="150" Text="PROXY" FontFamily="{StaticResource DecorFont}" FontSize="80" Foreground="#FFFFFF" />
-                    <StackPanel Canvas.Left="0" Canvas.Top="308" Width="452">
-                        <TextBlock Text="entering qr code" TextAlignment="Center"
-                                   FontFamily="{StaticResource PixelFont}" FontSize="24" Foreground="#FFFFFF" />
-                        <Image Source="Assets/Onboarding/invite-qr.png" Width="166" Height="166" Stretch="Uniform" Margin="0,24,0,0"
-                               HorizontalAlignment="Center" SnapsToDevicePixels="True" RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                    </StackPanel>
-                    <Button Canvas.Left="42" Canvas.Top="625" Width="365" Height="54" Style="{StaticResource ScaleTextButton}" Click="EntrySkip_Click">
-                        <TextBlock Text="I already have connection&#x0a;link -&gt; skip" TextAlignment="Center" FontSize="24" />
-                    </Button>
-                </Canvas>
-            </Border>
+        <Grid x:Name="EntryScreen" Background="{StaticResource GreenBrush}" Visibility="Collapsed">
+            <Canvas Width="500" Height="800">
+                <TextBlock Canvas.Left="0" Canvas.Top="80" Width="500" Text="LOKI" TextAlignment="Center" FontFamily="{StaticResource DecorFont}" FontSize="80" Foreground="#FFFFFF" />
+                <TextBlock Canvas.Left="0" Canvas.Top="185" Width="500" Text="PROXY" TextAlignment="Center" FontFamily="{StaticResource DecorFont}" FontSize="80" Foreground="#FFFFFF" />
+                <StackPanel Canvas.Left="0" Canvas.Top="343" Width="500">
+                    <TextBlock Text="entering qr code" TextAlignment="Center"
+                               FontFamily="{StaticResource PixelFont}" FontSize="24" Foreground="#FFFFFF" />
+                    <Image Source="Assets/Onboarding/invite-qr.png" Width="166" Height="166" Stretch="Uniform" Margin="0,24,0,0"
+                           HorizontalAlignment="Center" SnapsToDevicePixels="True" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                </StackPanel>
+                <Button Canvas.Left="68" Canvas.Top="660" Width="365" Height="54" Style="{StaticResource ScaleTextButton}" Click="EntrySkip_Click">
+                    <TextBlock Text="I already have connection&#x0a;link -&gt; skip" TextAlignment="Center" FontSize="24" />
+                </Button>
+            </Canvas>
         </Grid>
 
         <Grid x:Name="GuideScreen" Background="#000000" Visibility="Collapsed">
@@ -477,13 +474,16 @@
                 <Button Canvas.Left="32" Canvas.Top="250" Style="{StaticResource PixelTextButton}" Click="AutoUpdateToggle_Click">
                     <TextBlock x:Name="AutoUpdateToggleText" Text="3. Auto updates enabled" FontSize="24" />
                 </Button>
-                <Button Canvas.Left="32" Canvas.Top="300" Style="{StaticResource PixelTextButton}" Click="ShowFirstLaunchGuide_Click">
-                    <TextBlock Text="4. Open first launch guide" FontSize="24" />
+                <Button Canvas.Left="32" Canvas.Top="300" Style="{StaticResource PixelTextButton}" Click="RequestUpdate_Click">
+                    <TextBlock Text="4. Request update" FontSize="24" />
                 </Button>
-                <Button Canvas.Left="32" Canvas.Top="350" Style="{StaticResource PixelTextButton}" Click="DeleteApp_Click">
-                    <TextBlock Text="5. Delete application" FontSize="24" />
+                <Button Canvas.Left="32" Canvas.Top="350" Style="{StaticResource PixelTextButton}" Click="ShowFirstLaunchGuide_Click">
+                    <TextBlock Text="5. Open first launch guide" FontSize="24" />
                 </Button>
-                <TextBlock x:Name="SettingsMessageText" Canvas.Left="32" Canvas.Top="430" Width="430" TextWrapping="Wrap"
+                <Button Canvas.Left="32" Canvas.Top="400" Style="{StaticResource PixelTextButton}" Click="DeleteApp_Click">
+                    <TextBlock Text="6. Delete application" FontSize="24" />
+                </Button>
+                <TextBlock x:Name="SettingsMessageText" Canvas.Left="32" Canvas.Top="480" Width="430" TextWrapping="Wrap"
                            FontFamily="{StaticResource PixelFont}" FontSize="18" Foreground="{StaticResource GreenBrush}" />
                 <TextBlock x:Name="ClientVersionText" Canvas.Left="32" Canvas.Top="744" Width="430"
                            FontFamily="{StaticResource PixelFont}" FontSize="14" Foreground="#777777" TextAlignment="Right" />

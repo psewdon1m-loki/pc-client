@@ -843,6 +843,24 @@ public partial class MainWindow : Window
         });
     }
 
+    private async void RequestUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiAsync(async () =>
+        {
+            SettingsMessageText.Foreground = System.Windows.Media.Brushes.SeaGreen;
+            SettingsMessageText.Text = "checking updates...";
+            var result = await _controller.CheckForUpdatesNowAsync();
+            SettingsMessageText.Foreground = result.Success
+                ? System.Windows.Media.Brushes.SeaGreen
+                : System.Windows.Media.Brushes.Firebrick;
+            SettingsMessageText.Text = result.AppInstallerStarted
+                ? "update installer started"
+                : result.Success
+                    ? "updates checked"
+                    : "update check failed";
+        });
+    }
+
     private void ShowFirstLaunchGuide_Click(object sender, RoutedEventArgs e)
     {
         SettingsMessageText.Text = string.Empty;

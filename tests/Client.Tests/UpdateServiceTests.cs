@@ -61,6 +61,7 @@ public sealed class UpdateServiceTests
             Assert.True(result.Success, result.Message);
             Assert.Contains("global", result.UpdatedRuleSets);
             Assert.Equal("https://watcher.example.test", result.Watcher?.Endpoint);
+            Assert.Equal("https://updates.example.test/manifest.json", result.ManifestSource?.ToString());
             Assert.True(File.Exists(Path.Combine(ruleSetsDirectory, "global.zip")));
         }
         finally
@@ -112,6 +113,40 @@ public sealed class UpdateServiceTests
 
         Assert.True(result.Success, result.Message);
         Assert.False(result.ManifestUnavailable);
+    }
+
+    [Fact]
+    public async Task CheckAndApplyAsync_UsesFallbackManifestWhenPrimaryUnavailable()
+    {
+        var manifest = new
+        {
+            channel = "stable",
+            version = "0.1.0",
+            watcher = new
+            {
+                endpoint = "https://watcher-fallback.example.test"
+            }
+        };
+        var manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var service = new UpdateService(new HttpClient(new StaticResponseHandler(new Dictionary<string, byte[]>
+        {
+            ["https://updates.example.test/fallback-manifest.json"] = manifestBytes
+        })));
+
+        var result = await service.CheckAndApplyAsync(
+            new UpdateEndpointConfig
+            {
+                ManifestUrl = new Uri("https://updates.example.test/primary-manifest.json"),
+                FallbackManifestUrl = new Uri("https://updates.example.test/fallback-manifest.json")
+            },
+            "0.1.0",
+            Path.GetTempPath(),
+            Path.GetTempPath(),
+            Path.GetTempPath());
+
+        Assert.True(result.Success, result.Message);
+        Assert.Equal("https://watcher-fallback.example.test", result.Watcher?.Endpoint);
+        Assert.Equal("https://updates.example.test/fallback-manifest.json", result.ManifestSource?.ToString());
     }
 
     private static byte[] CreateRuleSetZip()

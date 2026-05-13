@@ -37,3 +37,9 @@ The client workspace expects a .NET 8 SDK. From `client/`, a local SDK can be us
 .\.dotnet\dotnet.exe build Client.sln
 .\.dotnet\dotnet.exe test Client.sln
 ```
+
+## Production Releases
+
+Use [release-guide.md](release-guide.md) as the release runbook. It covers
+production env files, version bumping, installer packaging, GitHub Release
+assets, update manifest rules, Watcher verification, smoke tests, and rollback.

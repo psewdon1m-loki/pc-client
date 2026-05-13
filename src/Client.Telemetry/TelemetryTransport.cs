@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -58,6 +59,11 @@ public sealed class TelemetryTransport(HttpClient httpClient)
         response.EnsureSuccessStatusCode();
         var commands = await response.Content.ReadFromJsonAsync<TelemetryCommandResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
         return commands?.Commands ?? [];
+    }
+
+    public static bool RequiresReEnroll(HttpRequestException exception)
+    {
+        return exception.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.NotFound;
     }
 
     public static string CreateSignature(

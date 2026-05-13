@@ -2,7 +2,7 @@
 
 Windows desktop client for Loki Proxy VPN. The client manages local proxy
 state, Xray runtime assets, routing rule sets, telemetry commands, and
-GitHub Releases based updates.
+manifest based updates.
 
 ## Repository scope
 
@@ -43,6 +43,10 @@ The installer is written to:
 artifacts\installer\LokiClientSetup-<version>-win-x64.exe
 ```
 
+For the full production release flow, including version bump, GitHub Release
+assets, manifest verification, and rollback notes, see
+[.docs/release-guide.md](.docs/release-guide.md).
+
 ## Production configuration
 
 For production builds, create this local file before publishing:
@@ -54,7 +58,10 @@ src\Client.App.Win\loki.env
 Example:
 
 ```env
-LOKI_UPDATE_MANIFEST_URL=https://github.com/psewdon1m-loki/pc-client/releases/latest/download/manifest.json
+LOKI_TELEMETRY_ENDPOINT=https://loki-p-watcher.shmoza.net
+LOKI_TELEMETRY_SNI=loki-p-watcher.shmoza.net
+LOKI_UPDATE_MANIFEST_URL=https://loki-p-watcher.shmoza.net/manifest.json
+LOKI_UPDATE_FALLBACK_MANIFEST_URL=https://github.com/psewdon1m-loki/pc-client/releases/latest/download/manifest.json
 LOKI_UPDATE_CHANNEL=stable
 LOKI_UPDATE_CHECK_INTERVAL_MINUTES=360
 LOKI_UPDATE_PUBLIC_KEY_PEM=
@@ -63,10 +70,14 @@ LOKI_UPDATE_PUBLIC_KEY_PEM=
 `loki.env` is intentionally ignored by git, but the app project includes it in
 publish output when the file exists.
 
-## GitHub Releases update flow
+## Update flow
 
-The updater reads `manifest.json` from GitHub Releases. This file is the stable
-entry point that tells the client which app installer, routing rule sets, and
+The client reads `manifest.json` from `LOKI_UPDATE_MANIFEST_URL`. Production should
+point this to Loki Watcher. If that endpoint is unavailable, the
+client falls back to `LOKI_UPDATE_FALLBACK_MANIFEST_URL`, which can stay on
+GitHub Releases.
+
+The manifest tells the client which app installer, routing rule sets, and
 watcher endpoint should be used.
 
 Minimum release assets:
@@ -115,13 +126,13 @@ Example:
 
 ## One-file release policy
 
-For manual installation, publish the installer as the single user-facing file.
-For automatic updates, keep `manifest.json` as a separate release asset because
-the client needs a stable URL to discover new versions.
+For manual installation, publish `LokiClientRelease-<version>-win-x64.zip` as
+the user-facing file. It contains the installer, manifest, and rule-set zips.
 
-If release asset count becomes a problem, the next compatible step is an update
-bundle zip: `manifest.json` stays separate, while installer and rule-set zips
-are packed into one downloadable archive referenced by the manifest.
+For automatic updates, Loki Watcher can read the bundled zip from GitHub Releases
+and expose the installer/rule-set files through its own `/assets/...` endpoints.
+Separate `manifest.json`, installer and rule-set assets remain supported as a
+fallback for older releases.
 
 ## Routing rule sets
 
@@ -162,8 +173,9 @@ Before publishing a release:
 .\.dotnet\dotnet.exe test Client.sln --no-restore
 .\scripts\publish.ps1
 .\scripts\package-inno.ps1
-Get-FileHash artifacts\installer\LokiClientSetup-<version>-win-x64.exe -Algorithm SHA256
+.\scripts\prepare-release.ps1
 ```
 
-Then update `manifest.json`, verify its SHA256 values, and upload it to the
-GitHub Release together with the installer and optional remote rule-set zips.
+Then upload the contents of `artifacts\release` to the GitHub Release.
+The full GitHub release procedure is documented in
+[.docs/release-guide.md](.docs/release-guide.md).

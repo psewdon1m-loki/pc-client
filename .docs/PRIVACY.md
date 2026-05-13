@@ -37,7 +37,8 @@ Mandatory telemetry may include:
 - configured connection inventory without VLESS secrets, including profile name, protocol, host, port, transport, security mode, SNI and subscription flag;
 - timestamped heartbeat and connection events;
 - traffic counters measured while the proxy is connected;
-- device type.
+- device type;
+- update state, including installed client version, auto-update setting, active routing rule set, watcher/update endpoint configuration and last update-check result.
 
 Traffic counters are operational counters and do not include visited domains, URLs or DNS queries.
 
@@ -65,7 +66,7 @@ Raw IP and core telemetry retention should be defined by the operator's server-s
 
 ## Server Requests
 
-The client sends telemetry every 1 hour by default. Loki Watcher can also queue a `collect_now` command. The client polls for commands and sends a fresh telemetry batch when that command is received.
+The client sends telemetry every 1 hour by default. Loki Watcher can also queue commands such as `collect_now`, `check_updates` and watcher endpoint changes. The client polls for commands and sends fresh telemetry or update state when those commands are received.
 
 If an operator deletes a client from Loki Watcher, the server removes its dashboard record, queued commands and stored events. If the same installed client later starts or sends telemetry again, it enrolls again and a fresh server-side record is created.
 
@@ -73,7 +74,7 @@ If an operator deletes a client from Loki Watcher, the server removes its dashbo
 
 Production telemetry endpoints must use HTTPS with a valid certificate. The endpoint should be configured through `LOKI_TELEMETRY_ENDPOINT` using the public telemetry hostname so TLS SNI, certificate name and routing host match.
 
-After enrollment, telemetry requests are signed with HMAC SHA-256 using a per-install client secret. Dashboard access should be protected with `LOKI_WATCHER_DASHBOARD_TOKEN` before exposure outside localhost.
+After enrollment, telemetry requests are signed with HMAC SHA-256 using a per-install client secret. Dashboard access should be protected with `LOKI_WATCHER_DASHBOARD_USERNAME` and `LOKI_WATCHER_DASHBOARD_PASSWORD` before exposure outside localhost.
 
 ## User Control
 

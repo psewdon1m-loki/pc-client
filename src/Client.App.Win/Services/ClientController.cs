@@ -1,6 +1,10 @@
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Client.Core;
 using Client.Platform.Windows;
 using Client.Profiles;
@@ -28,6 +32,8 @@ public sealed class ClientController
     private readonly SystemProxyService _proxy = new();
     private readonly ProxyConnectivityVerifier _connectivityVerifier = new();
     private readonly BrowserProxyCompatibilityService _browserProxyCompatibility = new();
+    private readonly ServiceTrafficProxy _serviceTrafficProxy = new();
+    private readonly HttpClient _updateStateHttpClient;
     private readonly GeoAssetUpdater _geoUpdater;
     private readonly UpdateService _updateService;
     private readonly SemaphoreSlim _operationLock = new(1, 1);
@@ -45,8 +51,9 @@ public sealed class ClientController
     public ClientController()
     {
         _ = _proxy.DisableLokiLocalHttpProxy();
-        _geoUpdater = new GeoAssetUpdater(new HttpClient());
-        _updateService = new UpdateService(new HttpClient { Timeout = TimeSpan.FromSeconds(60) });
+        _geoUpdater = new GeoAssetUpdater(CreateServiceHttpClient(TimeSpan.FromSeconds(60)));
+        _updateService = new UpdateService(CreateServiceHttpClient(TimeSpan.FromSeconds(60)));
+        _updateStateHttpClient = CreateServiceHttpClient(TimeSpan.FromSeconds(10));
         _database = new ClientDatabase(_paths.DatabasePath);
         _profiles = new ProfileRepository(_database);
         _settings = new SettingsRepository(_database);
@@ -54,13 +61,32 @@ public sealed class ClientController
         _logger = new SimpleFileLogger(_paths);
         _telemetry = new TelemetryService(
             _paths,
-            new TelemetryTransport(new HttpClient { Timeout = TimeSpan.FromSeconds(15) }),
+            new TelemetryTransport(CreateServiceHttpClient(TimeSpan.FromSeconds(15))),
             new NetworkTrafficSampler());
         _telemetry.CommandReceived += HandleTelemetryCommandAsync;
     }
 
     public AppPaths Paths => _paths;
     public ConnectionSnapshot Snapshot { get; private set; } = new();
+
+    private HttpClient CreateServiceHttpClient(TimeSpan timeout, bool allowInvalidTls = false)
+    {
+        var handler = new HttpClientHandler
+        {
+            UseProxy = true,
+            Proxy = _serviceTrafficProxy
+        };
+
+        if (allowInvalidTls)
+        {
+            handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+        }
+
+        return new HttpClient(handler)
+        {
+            Timeout = timeout
+        };
+    }
 
     public void ResetErrorState()
     {
@@ -168,8 +194,8 @@ public sealed class ClientController
         }
 
         var settings = await _settings.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var fetched = await SubscriptionClient
-            .Create(settings.AllowInvalidSubscriptionTls)
+        var fetched = await new SubscriptionClient(
+                CreateServiceHttpClient(TimeSpan.FromSeconds(60), settings.AllowInvalidSubscriptionTls))
             .FetchAsync(input.Trim(), cancellationToken)
             .ConfigureAwait(false);
         if (!fetched.Success || fetched.Value is null)
@@ -320,11 +346,17 @@ public sealed class ClientController
             return xrayResult;
         }
 
+        _serviceTrafficProxy.EnableHttpProxy(effectiveSettings.HttpPort);
+        await _logger.InfoAsync(
+            $"Service traffic proxy enabled | http=127.0.0.1:{effectiveSettings.HttpPort}",
+            cancellationToken).ConfigureAwait(false);
+
         if (effectiveSettings.RoutingMode != RoutingModes.LocalOnly)
         {
             var proxyResult = _proxy.EnableHttpProxy(effectiveSettings.HttpPort, effectiveSettings.SocksPort);
             if (!proxyResult.Success)
             {
+                _serviceTrafficProxy.Disable();
                 await _xray.StopAsync(cancellationToken).ConfigureAwait(false);
                 Snapshot = Snapshot with { State = ConnectionStates.Error, ActiveProfileName = activeProfile.Name, LastError = proxyResult.Message };
                 await _logger.ErrorAsync(proxyResult.Message, cancellationToken).ConfigureAwait(false);
@@ -338,6 +370,7 @@ public sealed class ClientController
                 cancellationToken).ConfigureAwait(false);
             if (!_proxy.IsEnabledForLocalHttpProxy(effectiveSettings.HttpPort))
             {
+                _serviceTrafficProxy.Disable();
                 await _xray.StopAsync(cancellationToken).ConfigureAwait(false);
                 RestoreOrClearProxyState();
 
@@ -389,11 +422,14 @@ public sealed class ClientController
             && _previousProxyState is null
             && !_xray.IsRunning)
         {
+            _serviceTrafficProxy.Disable();
             await CleanupBrowserProxyCompatibilityAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
         await _logger.InfoAsync("Disconnect requested.", cancellationToken).ConfigureAwait(false);
+        _serviceTrafficProxy.Disable();
+        await _logger.InfoAsync("Service traffic proxy disabled.", cancellationToken).ConfigureAwait(false);
         RestoreOrClearProxyState();
         await _logger.InfoAsync("System proxy restored or Loki proxy traces disabled.", cancellationToken).ConfigureAwait(false);
 
@@ -428,6 +464,8 @@ public sealed class ClientController
                 AppContext.BaseDirectory,
                 cancellationToken).ConfigureAwait(false);
             await HandleUpdateResultAsync(result, cancellationToken).ConfigureAwait(false);
+            var reportConfig = UpdateEndpointConfigLoader.Load(AppContext.BaseDirectory, _paths.DataDirectory);
+            await ReportUpdateStateAsync(reportConfig, result, cancellationToken).ConfigureAwait(false);
             return result;
         }
         finally
@@ -667,15 +705,123 @@ public sealed class ClientController
         }
     }
 
+    private async Task ReportUpdateStateAsync(
+        UpdateEndpointConfig config,
+        UpdateCheckResult result,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = BuildUpdateStateEndpoint(config.ManifestUrl);
+        if (endpoint is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = await _settings.LoadAsync(cancellationToken).ConfigureAwait(false);
+            var telemetryDirectory = Path.Combine(_paths.DataDirectory, "telemetry");
+            var identity = await TelemetryIdentity.LoadOrCreateAsync(telemetryDirectory, cancellationToken).ConfigureAwait(false);
+            var watcherConfig = TelemetryEndpointConfig.Load(AppContext.BaseDirectory, _paths.DataDirectory);
+            var activeRuleSet = RuleSetProvider.GetRuleSetFileId(settings.RoutingMode);
+            var body = JsonSerializer.Serialize(new
+            {
+                clientId = identity.ClientId,
+                displayId = identity.DisplayId,
+                appVersion = UpdateService.GetCurrentApplicationVersion(),
+                routingMode = settings.RoutingMode,
+                activeRuleSet,
+                autoUpdatesEnabled = settings.AutoUpdateRules,
+                logsUploadEnabled = settings.LogsConsent,
+                watcherEndpoint = watcherConfig.Endpoint.ToString().TrimEnd('/'),
+                watcherSni = watcherConfig.SniHost ?? string.Empty,
+                updateManifestUrl = config.ManifestUrl?.ToString(),
+                updateFallbackManifestUrl = config.FallbackManifestUrl?.ToString(),
+                lastCheckSuccess = result.Success,
+                lastCheckMessage = result.Message,
+                updatedRuleSets = result.UpdatedRuleSets,
+                ruleSets = BuildRuleSetState(),
+                timestamp = DateTimeOffset.UtcNow
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            };
+            using var response = await _updateStateHttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.NotFound)
+            {
+                await _telemetry.EnsureEnrolledAsync(cancellationToken).ConfigureAwait(false);
+                using var retryRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                {
+                    Content = new StringContent(body, Encoding.UTF8, "application/json")
+                };
+                using var retryResponse = await _updateStateHttpClient.SendAsync(retryRequest, cancellationToken).ConfigureAwait(false);
+                if (!retryResponse.IsSuccessStatusCode)
+                {
+                    await _logger.InfoAsync($"Update state report skipped after re-enroll: HTTP {(int)retryResponse.StatusCode}", cancellationToken).ConfigureAwait(false);
+                }
+            }
+            else if (!response.IsSuccessStatusCode)
+            {
+                await _logger.InfoAsync($"Update state report skipped: HTTP {(int)response.StatusCode}", cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or JsonException)
+        {
+            await _logger.InfoAsync($"Update state report failed: {ex.Message}", CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    private IReadOnlyList<object> BuildRuleSetState()
+    {
+        var ids = new[] { "russia-smart", "global", "whitelist", "blacklist" };
+        return ids.Select(id =>
+        {
+            var zipPath = Path.Combine(_paths.RuleSetsDirectory, id + ".zip");
+            var jsonPath = Path.Combine(_paths.RuleSetsDirectory, id + ".json");
+            var path = File.Exists(zipPath) ? zipPath : File.Exists(jsonPath) ? jsonPath : null;
+            return new
+            {
+                id,
+                source = path is null ? "fallback" : Path.GetExtension(path).Equals(".zip", StringComparison.OrdinalIgnoreCase) ? "zip" : "json",
+                sha256 = path is null ? string.Empty : FileSha256(path)
+            };
+        }).ToArray();
+    }
+
+    private static Uri? BuildUpdateStateEndpoint(Uri? manifestUrl)
+    {
+        if (manifestUrl is null || manifestUrl.Host.Contains("github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var builder = new UriBuilder(manifestUrl)
+        {
+            Path = "/api/v1/update-state",
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return builder.Uri;
+    }
+
+    private static string FileSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+    }
+
     private async Task ApplyWatcherConfigAsync(UpdateWatcherConfig watcher, CancellationToken cancellationToken)
     {
+        var watcherEndpoint = watcher.Endpoint.TrimEnd('/');
         var envPath = Path.Combine(_paths.DataDirectory, "loki.env");
         UpsertEnvValues(envPath, new Dictionary<string, string>
         {
-            ["LOKI_TELEMETRY_ENDPOINT"] = watcher.Endpoint,
-            ["LOKI_TELEMETRY_SNI"] = watcher.Sni ?? string.Empty
+            ["LOKI_TELEMETRY_ENDPOINT"] = watcherEndpoint,
+            ["LOKI_TELEMETRY_SNI"] = watcher.Sni ?? string.Empty,
+            ["LOKI_UPDATE_MANIFEST_URL"] = $"{watcherEndpoint}/manifest.json"
         });
-        await _logger.InfoAsync($"Watcher endpoint updated: {watcher.Endpoint}", cancellationToken).ConfigureAwait(false);
+        await _logger.InfoAsync($"Watcher endpoint updated: {watcherEndpoint}", cancellationToken).ConfigureAwait(false);
         var settings = await _settings.LoadAsync(cancellationToken).ConfigureAwait(false);
         await ConfigureAndReportTelemetryAsync(settings.LogsConsent).ConfigureAwait(false);
     }

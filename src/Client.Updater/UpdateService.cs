@@ -24,26 +24,18 @@ public sealed class UpdateService(HttpClient httpClient)
         string appBaseDirectory,
         CancellationToken cancellationToken = default)
     {
-        if (!config.IsConfigured || config.ManifestUrl is null)
+        if (!config.IsConfigured)
         {
             return UpdateCheckResult.Skipped("Update manifest URL is not configured.");
         }
 
         UpdateManifest manifest;
+        Uri manifestSource;
         try
         {
-            var manifestBytes = await httpClient.GetByteArrayAsync(config.ManifestUrl, cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(config.PublicKeyPem))
-            {
-                var signatureUrl = new Uri(config.ManifestUrl.ToString() + ".sig");
-                var signatureBytes = await httpClient.GetByteArrayAsync(signatureUrl, cancellationToken).ConfigureAwait(false);
-                if (!VerifySignature(manifestBytes, signatureBytes, config.PublicKeyPem))
-                {
-                    return UpdateCheckResult.Fail("Update manifest signature is invalid.");
-                }
-            }
-
+            var (manifestBytes, source) = await DownloadManifestWithFallbackAsync(config, cancellationToken).ConfigureAwait(false);
             manifest = JsonSerializer.Deserialize<UpdateManifest>(StripUtf8Bom(manifestBytes), JsonOptions) ?? new UpdateManifest();
+            manifestSource = source;
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or JsonException or CryptographicException)
         {
@@ -54,7 +46,7 @@ public sealed class UpdateService(HttpClient httpClient)
         {
             if (!string.Equals(manifest.Channel, config.Channel, StringComparison.OrdinalIgnoreCase))
             {
-                return UpdateCheckResult.Ok($"Update manifest channel '{manifest.Channel}' ignored.");
+                return UpdateCheckResult.Ok($"Update manifest channel '{manifest.Channel}' ignored.", manifestSource: manifestSource);
             }
 
             var updatedRuleSets = await ApplyRuleSetUpdatesAsync(manifest, ruleSetsDirectory, cancellationToken).ConfigureAwait(false);
@@ -71,12 +63,44 @@ public sealed class UpdateService(HttpClient httpClient)
                 appInstallerStarted,
                 watcherChanged: watcher is not null,
                 updatedRuleSets,
-                watcher);
+                watcher,
+                manifestSource);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or TaskCanceledException or System.ComponentModel.Win32Exception)
         {
             return UpdateCheckResult.Fail($"Update apply failed: {ex.Message}");
         }
+    }
+
+    private async Task<(byte[] ManifestBytes, Uri Source)> DownloadManifestWithFallbackAsync(
+        UpdateEndpointConfig config,
+        CancellationToken cancellationToken)
+    {
+        Exception? primaryError = null;
+        foreach (var manifestUrl in new[] { config.ManifestUrl, config.FallbackManifestUrl }.Where(item => item is not null).Cast<Uri>())
+        {
+            try
+            {
+                var manifestBytes = await httpClient.GetByteArrayAsync(manifestUrl, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(config.PublicKeyPem))
+                {
+                    var signatureUrl = new Uri(manifestUrl.ToString() + ".sig");
+                    var signatureBytes = await httpClient.GetByteArrayAsync(signatureUrl, cancellationToken).ConfigureAwait(false);
+                    if (!VerifySignature(manifestBytes, signatureBytes, config.PublicKeyPem))
+                    {
+                        throw new CryptographicException("Update manifest signature is invalid.");
+                    }
+                }
+
+                return (manifestBytes, manifestUrl);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or CryptographicException)
+            {
+                primaryError ??= ex;
+            }
+        }
+
+        throw primaryError ?? new HttpRequestException("Update manifest URL is not configured.");
     }
 
     public static string GetCurrentApplicationVersion()
