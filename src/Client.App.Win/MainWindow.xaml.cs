@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     private bool _isRefreshingProfiles;
     private DateTimeOffset _operationProgressStartedAt;
     private double _operationProgress;
+    private string _clientDisplayId = string.Empty;
     private HwndSource? _windowSource;
 
     public MainWindow()
@@ -83,6 +84,7 @@ public partial class MainWindow : Window
         {
             await _controller.InitializeAsync();
             _settings = await _controller.LoadSettingsAsync();
+            _clientDisplayId = await _controller.GetClientDisplayIdAsync();
             await RefreshProfilesAsync();
             UpdateSnapshot(_controller.Snapshot);
             ShowScreen(HasCompletedOnboarding() ? MainScreen : EntryScreen);
@@ -783,11 +785,39 @@ public partial class MainWindow : Window
 
         await RunUiAsync(async () =>
         {
-            await _controller.DeleteProfileAsync(_contextProfile.Profile.Id);
-            _settings = await _controller.LoadSettingsAsync();
-            await RefreshProfilesAsync();
-            ConnectionContextPopup.IsOpen = false;
+            await DeleteProfileRowAsync(_contextProfile);
         });
+    }
+
+    private async void DeleteActiveProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as System.Windows.Controls.Button)?.CommandParameter is not ProfileRow row)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await RunUiAsync(async () =>
+        {
+            await DeleteProfileRowAsync(row);
+        });
+    }
+
+    private async Task DeleteProfileRowAsync(ProfileRow row)
+    {
+        if (_connected && row.Profile.Id == _settings.ActiveProfileId)
+        {
+            await _controller.DisconnectAsync();
+            _connected = false;
+            _connectedAt = null;
+            _sessionTimer.Stop();
+            UpdateSnapshot(_controller.Snapshot);
+        }
+
+        await _controller.DeleteProfileAsync(row.Profile.Id);
+        _settings = await _controller.LoadSettingsAsync();
+        await RefreshProfilesAsync();
+        ConnectionContextPopup.IsOpen = false;
     }
 
     private async void RussiaMode_Click(object sender, RoutedEventArgs e)
@@ -909,6 +939,9 @@ public partial class MainWindow : Window
         AutoUpdateToggleText.Text = _settings.AutoUpdateRules
             ? "3. Auto updates enabled"
             : "3. Auto updates disabled";
+        ClientIdText.Text = string.IsNullOrWhiteSpace(_clientDisplayId)
+            ? "id -"
+            : $"id {_clientDisplayId}";
         ClientVersionText.Text = $"client v{UpdateService.GetCurrentApplicationVersion()}";
     }
 

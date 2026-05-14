@@ -132,6 +132,14 @@ public sealed class ClientController
         return await _settings.LoadAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<string> GetClientDisplayIdAsync(CancellationToken cancellationToken = default)
+    {
+        var identity = await TelemetryIdentity
+            .LoadOrCreateAsync(Path.Combine(_paths.DataDirectory, "telemetry"), cancellationToken)
+            .ConfigureAwait(false);
+        return identity.DisplayId;
+    }
+
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         await _settings.SaveAsync(settings, cancellationToken).ConfigureAwait(false);
@@ -620,9 +628,14 @@ public sealed class ClientController
     {
         if (enabled)
         {
-            if (_updateLoopCancellation is not null)
+            if (_updateLoopCancellation is not null && _updateLoop is { IsCompleted: false })
             {
                 return;
+            }
+
+            if (_updateLoopCancellation is not null)
+            {
+                _updateLoopCancellation.Dispose();
             }
 
             _updateLoopCancellation = new CancellationTokenSource();
@@ -662,31 +675,59 @@ public sealed class ClientController
 
     private async Task RunAutoUpdateLoopAsync(CancellationToken cancellationToken)
     {
-        await RunSingleUpdateCheckAsync(cancellationToken).ConfigureAwait(false);
-        while (!cancellationToken.IsCancellationRequested)
+        await _logger.InfoAsync("Auto-update loop started.", cancellationToken).ConfigureAwait(false);
+        try
         {
-            var config = UpdateEndpointConfigLoader.Load(AppContext.BaseDirectory, _paths.DataDirectory);
-            var interval = config.CheckInterval;
-            using var timer = new PeriodicTimer(interval);
-            if (!await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                return;
-            }
-
             await RunSingleUpdateCheckAsync(cancellationToken).ConfigureAwait(false);
+            await WaitAndRunStartupUpdateRetryAsync(cancellationToken).ConfigureAwait(false);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var config = UpdateEndpointConfigLoader.Load(AppContext.BaseDirectory, _paths.DataDirectory);
+                var interval = config.CheckInterval;
+                using var timer = new PeriodicTimer(interval);
+                if (!await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                await RunSingleUpdateCheckAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            await _logger.ErrorAsync($"Auto-update loop failed: {ex.Message}", CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    private async Task WaitAndRunStartupUpdateRetryAsync(CancellationToken cancellationToken)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
+        await RunSingleUpdateCheckAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RunSingleUpdateCheckAsync(CancellationToken cancellationToken)
     {
-        var result = await CheckForUpdatesNowAsync(cancellationToken).ConfigureAwait(false);
-        if (!result.Success && !result.ManifestUnavailable)
+        try
         {
-            await _logger.ErrorAsync(result.Message, cancellationToken).ConfigureAwait(false);
+            var result = await CheckForUpdatesNowAsync(cancellationToken).ConfigureAwait(false);
+            if (!result.Success && !result.ManifestUnavailable)
+            {
+                await _logger.ErrorAsync(result.Message, cancellationToken).ConfigureAwait(false);
+            }
+            else if (!result.ManifestUnavailable)
+            {
+                await _logger.InfoAsync(result.Message, cancellationToken).ConfigureAwait(false);
+            }
         }
-        else if (!result.ManifestUnavailable)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await _logger.InfoAsync(result.Message, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await _logger.ErrorAsync($"Auto-update check failed: {ex.Message}", CancellationToken.None).ConfigureAwait(false);
         }
     }
 

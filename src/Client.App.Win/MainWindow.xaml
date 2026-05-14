@@ -25,6 +25,7 @@
         <SolidColorBrush x:Key="WhiteBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="GreenBrush" Color="#57C086" />
         <SolidColorBrush x:Key="RedBrush" Color="#EA2F2F" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <Style TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource PixelFont}" />
@@ -422,19 +423,27 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" LineHeight="28" Height="28">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#FFFFFF" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                <Setter Property="Foreground" Value="{StaticResource GreenBrush}" />
-                                                <Setter Property="TextDecorations" Value="Underline" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                            <Grid Width="438" Height="32">
+                                <TextBlock Text="{Binding Label}" Width="382" HorizontalAlignment="Left"
+                                           TextTrimming="CharacterEllipsis" LineHeight="28" Height="28">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource GreenBrush}" />
+                                                    <Setter Property="TextDecorations" Value="Underline" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Button Width="24" Height="28" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Style="{StaticResource PixelTextButton}" FontSize="24"
+                                        Content="x" CommandParameter="{Binding}"
+                                        Click="DeleteActiveProfile_Click"
+                                        Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -485,7 +494,9 @@
                 </Button>
                 <TextBlock x:Name="SettingsMessageText" Canvas.Left="32" Canvas.Top="480" Width="430" TextWrapping="Wrap"
                            FontFamily="{StaticResource PixelFont}" FontSize="18" Foreground="{StaticResource GreenBrush}" />
-                <TextBlock x:Name="ClientVersionText" Canvas.Left="32" Canvas.Top="744" Width="430"
+                <TextBlock x:Name="ClientIdText" Canvas.Left="32" Canvas.Top="744" Width="220"
+                           FontFamily="{StaticResource PixelFont}" FontSize="14" Foreground="#777777" TextAlignment="Left" />
+                <TextBlock x:Name="ClientVersionText" Canvas.Left="252" Canvas.Top="744" Width="210"
                            FontFamily="{StaticResource PixelFont}" FontSize="14" Foreground="#777777" TextAlignment="Right" />
             </Canvas>
         </Grid>
