@@ -316,6 +316,17 @@ Install on a clean user profile or test VM:
 10. Use Settings -> Request update.
 11. Confirm update-state appears on Watcher dashboard.
 
+Local traffic-path lab:
+
+1. Connect Loki with the routing mode being tested.
+2. From the workspace root, run `.\traffic-lab\run.ps1`.
+3. Open the generated JSON/CSV report under `traffic-lab\artifacts`.
+4. Confirm explicit/env profiles report
+   `likelyReachedXray=true`.
+5. Confirm direct profiles report `likelyReachedXray=false`.
+6. Use system profiles to verify whether normal Windows system proxy consumers
+   are actually reaching Xray.
+
 Upgrade test:
 
 1. Install previous release.

@@ -55,7 +55,11 @@ public sealed class SystemProxyService
             key.SetValue("ProxyOverride", proxyBypass, RegistryValueKind.String);
             key.DeleteValue("AutoConfigURL", throwOnMissingValue: false);
             SetWinHttpProxy(winHttpProxyServer, proxyBypass);
-            RunProxySideEffects(NotifyWindows);
+            RunProxySideEffects(() =>
+            {
+                SetProxyEnvironment(httpPort, proxyBypass);
+                NotifyWindows();
+            });
             return OperationResult.Ok("System proxy включен.");
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
@@ -265,7 +269,7 @@ public sealed class SystemProxyService
 
     private static string BuildLocalProxyServer(int httpPort, int socksPort)
     {
-        return $"http=127.0.0.1:{httpPort};https=127.0.0.1:{httpPort};ftp=127.0.0.1:{httpPort};socks=127.0.0.1:{socksPort}";
+        return $"127.0.0.1:{httpPort}";
     }
 
     private static string BuildLocalHttpProxyServer(int httpPort)
@@ -309,6 +313,15 @@ public sealed class SystemProxyService
         SetOrDeleteUserEnvironment("HTTPS_PROXY", state.HttpsProxyEnvironment);
         SetOrDeleteUserEnvironment("ALL_PROXY", state.AllProxyEnvironment);
         SetOrDeleteUserEnvironment("NO_PROXY", state.NoProxyEnvironment);
+    }
+
+    private static void SetProxyEnvironment(int httpPort, string proxyBypass)
+    {
+        var proxy = $"http://127.0.0.1:{httpPort}";
+        SetOrDeleteUserEnvironment("HTTP_PROXY", proxy);
+        SetOrDeleteUserEnvironment("HTTPS_PROXY", proxy);
+        SetOrDeleteUserEnvironment("ALL_PROXY", proxy);
+        SetOrDeleteUserEnvironment("NO_PROXY", ToNoProxy(proxyBypass));
     }
 
     private static void ClearLocalProxyEnvironment(int? httpPort = null)
@@ -370,6 +383,16 @@ public sealed class SystemProxyService
             || value.Contains("127.", StringComparison.OrdinalIgnoreCase)
             || value.Contains("10.", StringComparison.OrdinalIgnoreCase)
             || value.Contains("192.168.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ToNoProxy(string proxyBypass)
+    {
+        return string.Join(
+            ",",
+            proxyBypass
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(item => item == "<local>" ? "localhost" : item)
+                .Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     private static bool IsLocalHttpProxy(string? proxyServer, int httpPort)

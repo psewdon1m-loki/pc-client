@@ -1,5 +1,5 @@
 #define MyAppName "Loki Proxy VPN"
-#define MyAppVersion "0.1.66"
+#define MyAppVersion "0.1.67"
 #define MyAppPublisher "Loki"
 #define MyAppExeName "Client.App.Win.exe"
 

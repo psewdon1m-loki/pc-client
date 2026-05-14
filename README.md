@@ -179,3 +179,14 @@ Before publishing a release:
 Then upload the contents of `artifacts\release` to the GitHub Release.
 The full GitHub release procedure is documented in
 [.docs/release-guide.md](.docs/release-guide.md).
+
+## Local traffic lab
+
+The multi-profile traffic tester lives at the workspace root:
+
+```powershell
+..\traffic-lab\run.ps1
+```
+
+It checks native desktop, env-based, Node/Electron-class and browser traffic
+profiles against the local Loki proxy path.
