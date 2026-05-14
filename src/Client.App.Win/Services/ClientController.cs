@@ -374,11 +374,18 @@ public sealed class ClientController
                 await _xray.StopAsync(cancellationToken).ConfigureAwait(false);
                 RestoreOrClearProxyState();
 
-                var message = "Windows proxy settings were not applied to both WinINet and WinHTTP.";
+                var message = "Windows proxy settings were not applied.";
                 Snapshot = Snapshot with { State = ConnectionStates.Error, ActiveProfileName = activeProfile.Name, LastError = message };
                 await _logger.ErrorAsync(message, cancellationToken).ConfigureAwait(false);
                 await _telemetry.RecordStatusAsync(Snapshot, cancellationToken).ConfigureAwait(false);
                 return OperationResult.Fail(message);
+            }
+
+            if (!_proxy.IsWinHttpEnabledForLocalHttpProxy(effectiveSettings.HttpPort))
+            {
+                await _logger.InfoAsync(
+                    "WinHTTP proxy was not applied; continuing with WinINet system proxy.",
+                    cancellationToken).ConfigureAwait(false);
             }
 
             _ = RunBackgroundAsync(

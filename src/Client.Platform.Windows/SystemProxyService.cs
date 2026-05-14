@@ -68,8 +68,13 @@ public sealed class SystemProxyService
     {
         var state = Read();
         return state.ProxyEnabled
-            && IsLocalHttpProxy(state.ProxyServer, httpPort)
-            && IsLocalHttpProxy(state.WinHttpProxy, httpPort);
+            && IsLocalHttpProxy(state.ProxyServer, httpPort);
+    }
+
+    public bool IsWinHttpEnabledForLocalHttpProxy(int httpPort)
+    {
+        var state = Read();
+        return IsLocalHttpProxy(state.WinHttpProxy, httpPort);
     }
 
     public OperationResult DisableLocalHttpProxy(int httpPort)
